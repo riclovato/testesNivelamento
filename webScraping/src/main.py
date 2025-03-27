@@ -1,6 +1,8 @@
 import logging
 import re
 import requests
+import os
+import zipfile
 from typing import Optional, Dict
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
@@ -19,6 +21,8 @@ class WebScraper:
         self.session = requests.Session()
         self._set_default_headers()
         self.base_url = "https://www.gov.br/ans/pt-br/acesso-a-informacao/participacao-da-sociedade/atualizacao-do-rol-de-procedimentos"
+        self.download_dir = "downloads"
+        self._create_download_dir()
         self.targets = {
         "Anexo I": {
             "url_pattern": r".*Anexo_I[^/]*\.pdf$",
@@ -41,6 +45,11 @@ class WebScraper:
             """
     }
 }
+   
+   
+    def _create_download_dir(self):
+        os.makedirs(self.download_dir, exist_ok=True)
+        logger.info(f"Diretório de downloads criado: {os.path.abspath(self.download_dir)}")
 
 
     def _set_default_headers(self):
@@ -93,17 +102,71 @@ class WebScraper:
                         break
 
         return found
+    
+    
+    def download_pdfs(self, url:str) -> bool:
+        try:
+            filename = os.path.basename(url)
+            filepath = os.path.join(self.download_dir, filename)
+        
+            if os.path.exists(filepath):
+                logger.warning(f"Arquivo já existe: {filename}")
+                return True
+            
+            logger.info(f"Iniciando download: {filename}")
+            
+            with self.session.get(url, stream=True, timeout=20) as response:
+                response.raise_for_status()
+                with open(filepath, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+            
+            file_size = os.path.getsize(filepath)/1024/1024
+            logger.info(f"Download concluído: {filename} ({file_size:.2f} MB)")
+            return True
+        except Exception as e:
+            logger.error(f"Erro no download: {str(e)}")
+            return False
+    
+
+    def compress_files(self,) -> Optional[str]:
+        """ Compacta os arquivos em um único arquivo ZIP """
+
+        try:
+            files = [
+                os.path.join(self.download_dir, f)
+                for f in os.listdir(self.download_dir)
+                if f.lower().endswith('.pdf')
+            ]
+            if not files:
+                logger.error("Nenhum arquivo PDF encontrado")
+                return None
+            
+            zip_name = "Anexos.zip"
+            zip_path = os.path.join(self.download_dir, zip_name) 
+
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for file in files:
+                    zipf.write(file, os.path.basename(file))
+                    logger.info(f"Arquivo adicionado ao ZIP: {os.path.basename(file)}")
+
+            logger.info(f"Compactação concluída: {zip_path}")
+            return zip_path
+        except Exception as e:
+            logger.error(f"Erro na compactação: {str(e)}")
+            return None           
 
 
     
 def main():
     scraper = WebScraper()
     
-    # Etapa 1: Obter conteúdo da página
+    #  Obter conteúdo da página
     if (html := scraper.fetch_page()) is None:
         return
 
-    # Etapa 2: Encontrar links dos PDFs
+    # Encontrar links dos PDFs
     pdf_links = scraper.find_pdf_links(html)
     
     if not pdf_links:
@@ -115,6 +178,22 @@ def main():
     if missing:
         logger.error(f"Anexos faltantes: {', '.join(missing)}")
         return
+    
+    # Download dos pdfs
+    for name, url in pdf_links.items():
+        logger.info(f"\n{'='*50}\nProcessando: {name}\n{'='*50}")
+        if scraper.download_pdfs(url):
+            logger.info(f"{name} baixado com sucesso")
+        else:
+            logger.error(f"Falha no download: {name}")
+    
+    # Compactação dos arquivos
+    zip_path = scraper.compress_files()
+    if zip_path:
+        logger.info(f"\n{'='*50}\nArquivo compactado com sucesso!\nLocal:{zip_path}\n{'='*50}")
+    else:
+        logger.error("Falha na compactação dos arquivos")
+
 
 if __name__ == "__main__":
     main()
