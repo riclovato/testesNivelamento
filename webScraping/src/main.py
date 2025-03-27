@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 class WebScraper:
    
-    
     def __init__(self):
         self.session = requests.Session()
         self._set_default_headers()
