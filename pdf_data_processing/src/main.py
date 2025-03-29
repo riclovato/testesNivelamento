@@ -21,6 +21,32 @@ logging.basicConfig(
 )
 
 
+def extract_tables_pdf(PDF_PATH, max_pages = None):
+    """Extrai dados do pdf"""
+    logger = logging.getLogger(__name__)
+    data = []
+
+    try:
+        with pdfplumber.open(PDF_PATH) as pdf:
+            total_pages = len(pdf.pages)
+        
+            for i, page in enumerate(pdf.pages):
+                if max_pages and i >= max_pages:
+                    break
+                    
+                logger.info(f"Processando página {i + 1}/{total_pages}")
+                tables = page.extract_tables()
+                
+                for table in tables:
+                    for line in table:
+                        if line and "PROCEDIMENTO" not in str(line[0]):
+                            data.append([cell.strip() if cell else "" for cell in line])
+        logger.info(f"Extraídas {len(data)} linhas")
+        return data
+    except Exception as e:
+        logger.error(f"Erro na extração: {str(e)}")
+        sys.exit(1)
+
 
 def main():
     logger = logging.getLogger(__name__)
@@ -29,11 +55,16 @@ def main():
     #Verifica se o arquivo existe
     if not os.path.exists(PDF_PATH):
         logger.error("PDF não encontrado")
+        sys.exit(1)
         
     
     parser = argparse.ArgumentParser(description="Extrai tabelas do PDF")
     parser.add_argument("--pages", type=int, help="Número máximo de páginas para processar")
-    parser = parser.parse_args()
+    args = parser.parse_args()
+
+    #Extração
+    data = extract_tables_pdf(PDF_PATH, args.pages)
+    logger.info("Extração concluída com sucesso")
   
 
 
