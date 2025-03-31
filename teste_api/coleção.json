@@ -1,0 +1,57 @@
+{
+    "info": {
+      "_postman_id": "a1b2c3d4-e5f6-7g8h-9i0j-k1l2m3n4o5p6",
+      "name": "Busca Operadoras de Saúde",
+      "description": "Coleção para testar o endpoint de busca de operadoras de saúde",
+      "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+      {
+        "name": "Buscar Operadoras",
+        "request": {
+          "method": "GET",
+          "header": [],
+          "url": {
+            "raw": "http://localhost:5000/search?q={{query}}",
+            "protocol": "http",
+            "host": ["localhost"],
+            "port": "5000",
+            "path": ["search"],
+            "query": [
+              {
+                "key": "q",
+                "value": "{{query}}",
+                "description": "Termo de busca"
+              }
+            ]
+          }
+        },
+        "response": []
+      }
+    ],
+    "variable": [
+      {
+        "key": "query",
+        "value": "saude"
+      }
+    ],
+    "event": [
+      {
+        "listen": "test",
+        "script": {
+          "exec": [
+            "pm.test(\"Status code is 200\", function () {",
+            "    pm.response.to.have.status(200);",
+            "});",
+            "",
+            "pm.test(\"Response is JSON\", function () {",
+            "    pm.response.to.be.json;",
+            "});"
+          ],
+          "type": "text/javascript"
+        }
+      }
+    ],
+    "auth": null,
+    "protocolProfileBehavior": {}
+  }
